@@ -1,85 +1,93 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(page_title="Supplier Analytics Dashboard", layout="wide")
-st.title("📊 Supplier Analytics Dashboard")
-st.caption("Developed in Python + Streamlit (Colab Runtime)")
+st.set_page_config(page_title="Supplier Tracker Dashboard", page_icon="📦", layout="wide")
 
-# --------------------
-# Load Data
-# --------------------
-df = pd.read_csv("supply_chain_data.csv")  # uses your file
-df.columns = df.columns.str.strip().str.replace(" ", "_").str.lower()
+st.title("📊 Supplier Tracker Dashboard")
+st.caption("Supply Chain Analytics — Origin Cost | Supplier | Product Demand")
 
-# --------------------
-# Numeric Columns
-# --------------------
-num_cols = ['price','availability','number_of_products_sold','revenue_generated',
-            'stock_levels','lead_times','order_quantities','shipping_times','shipping_costs',
-            'lead_time','production_volumes','manufacturing_lead_time','manufacturing_costs',
-            'defect_rates','costs']
+uploaded_file = st.file_uploader("📂 Upload your supply_chain_data.csv", type=["csv"])
 
-for c in num_cols:
-    if c in df.columns:
-        df[c] = pd.to_numeric(df[c], errors='coerce')
+if uploaded_file:
+    # Read and clean
+    df = pd.read_csv(uploaded_file)
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-st.sidebar.header("🔍 Filters")
+    st.success("✅ File uploaded successfully!")
 
-# Detect possible supplier column automatically
-possible_supplier_cols = [c for c in df.columns if "supplier" in c]
-supplier_col = possible_supplier_cols[0] if possible_supplier_cols else None
+    # Sidebar Filters
+    st.sidebar.header("🔍 Filters")
+    suppliers = st.sidebar.multiselect("Select Supplier(s)", df['supplier_name'].unique())
+    origins = st.sidebar.multiselect("Select Origin(s)", df['origin'].unique())
+    destinations = st.sidebar.multiselect("Select Destination(s)", df['destination'].unique())
 
-if supplier_col:
-    suppliers = sorted(df[supplier_col].dropna().unique())
-    supplier_filter = st.sidebar.multiselect("Select Supplier(s)", suppliers)
-    if supplier_filter:
-        df = df[df[supplier_col].isin(supplier_filter)]
+    filtered_df = df.copy()
+    if suppliers:
+        filtered_df = filtered_df[filtered_df['supplier_name'].isin(suppliers)]
+    if origins:
+        filtered_df = filtered_df[filtered_df['origin'].isin(origins)]
+    if destinations:
+        filtered_df = filtered_df[filtered_df['destination'].isin(destinations)]
+
+    # KPIs
+    total_revenue = filtered_df['revenue_generated'].sum()
+    total_cost = filtered_df['costs'].sum()
+    total_volume = filtered_df['production_volumes'].sum()
+    avg_lead_time = filtered_df['lead_time'].mean()
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("💰 Total Revenue", f"₹{total_revenue:,.0f}")
+    k2.metric("💸 Total Cost", f"₹{total_cost:,.0f}")
+    k3.metric("🏭 Total Production Volume", f"{total_volume:,.0f}")
+    k4.metric("⏱ Avg Lead Time (Days)", f"{avg_lead_time:.1f}")
+
+    st.markdown("---")
+
+    # Tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🛣️ Route Cost", "🏭 Supplier Performance", "📦 Product Demand", "🌍 Origin Overview"
+    ])
+
+    # --- Route Cost ---
+    with tab1:
+        route_df = filtered_df.groupby(['origin', 'destination'])['costs'].mean().reset_index()
+        fig1 = px.scatter(route_df, x='origin', y='destination', size='costs', color='costs',
+                          title="Average Route-wise Cost", color_continuous_scale='tealrose')
+        st.plotly_chart(fig1, use_container_width=True)
+
+    # --- Supplier Performance ---
+    with tab2:
+        supplier_vol = (filtered_df.groupby(['supplier_name', 'product_type'])
+                        ['production_volumes'].sum().reset_index())
+        top5_suppliers = supplier_vol.groupby('supplier_name')['production_volumes'].sum().nlargest(5).index
+        top_df = supplier_vol[supplier_vol['supplier_name'].isin(top5_suppliers)]
+
+        fig2 = px.bar(top_df, x='supplier_name', y='production_volumes',
+                      color='product_type', text_auto=True,
+                      title="Top 5 Suppliers by Production Volume (Product Split)",
+                      template='plotly_white')
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # --- Product Demand ---
+    with tab3:
+        demand_df = (filtered_df.groupby('product_type')['number_of_products_sold']
+                     .sum().nlargest(5).reset_index())
+        fig3 = px.bar(demand_df, x='product_type', y='number_of_products_sold',
+                      color='product_type', text_auto=True,
+                      title="Top 5 Most Demanded Products", template='seaborn')
+        st.plotly_chart(fig3, use_container_width=True)
+
+    # --- Origin Overview ---
+    with tab4:
+        origin_df = (filtered_df.groupby('origin')
+                     .agg({'production_volumes': 'sum', 'revenue_generated': 'sum'})
+                     .reset_index())
+        fig4 = px.treemap(origin_df, path=['origin'], values='production_volumes',
+                          color='revenue_generated', color_continuous_scale='viridis',
+                          title="Origin-wise Supply & Revenue")
+        st.plotly_chart(fig4, use_container_width=True)
+
 else:
-    st.warning("⚠️ No supplier column found in data. Showing full dataset.")
+    st.info("👆 Please upload your CSV file to view the dashboard.")
 
-# --------------------
-# Supplier Summary
-# --------------------
-if supplier_col and {'revenue_generated','lead_time','production_volumes'}.issubset(df.columns):
-    st.subheader("Supplier Performance Summary")
-    supplier_summary = df.groupby(supplier_col).agg({
-        'revenue_generated':'sum',
-        'manufacturing_costs':'mean' if 'manufacturing_costs' in df.columns else 'mean',
-        'defect_rates':'mean' if 'defect_rates' in df.columns else 'mean',
-        'lead_time':'mean',
-        'production_volumes':'sum',
-        'shipping_costs':'mean' if 'shipping_costs' in df.columns else 'mean'
-    }).reset_index()
-    st.dataframe(supplier_summary)
-else:
-    st.info("ℹ️ Supplier summary not generated (missing supplier or key metric columns).")
-
-# --------------------
-# Route-wise Average Cost
-# --------------------
-if {'origin','destination','shipping_costs'}.issubset(df.columns):
-    st.subheader("🚚 Route-wise Average Cost")
-    route_summary = df.groupby(['origin','destination'])['shipping_costs'].mean().reset_index()
-    st.dataframe(route_summary)
-
-# --------------------
-# Top 5 Most Demanded Products
-# --------------------
-if {'product_name','order_quantities'}.issubset(df.columns):
-    st.subheader("🔥 Top 5 Most Demanded Products")
-    top_demand = df.groupby('product_name')['order_quantities'].sum().reset_index().sort_values(
-        'order_quantities', ascending=False).head(5)
-    st.dataframe(top_demand)
-
-# --------------------
-# Origin-wise Supply
-# --------------------
-if {'origin','order_quantities','revenue_generated'}.issubset(df.columns):
-    st.subheader("📦 Origin-wise Supply Summary")
-    origin_summary = df.groupby('origin').agg({
-        'order_quantities':'sum',
-        'revenue_generated':'sum'
-    }).reset_index()
-    st.dataframe(origin_summary)
-
-st.success("✅ Dashboard loaded successfully.")
