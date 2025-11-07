@@ -1,7 +1,4 @@
-requirements.txt
-streamlit
-pandas
-plotly
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -111,4 +108,5 @@ st.markdown(
     "<p style='text-align:center;'>📊 Supply Chain Dashboard | Designed by <b>Ravi Yadav</b></p>",
     unsafe_allow_html=True
 )
+
 
