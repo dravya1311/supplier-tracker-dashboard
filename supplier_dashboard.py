@@ -98,7 +98,7 @@ with tab2:
     top_suppliers = supplier_vol.groupby('supplier_name')['production_volumes'].sum().nlargest(5).index
     top_df = supplier_vol[supplier_vol['supplier_name'].isin(top_suppliers)]
     fig2 = px.bar(top_df, x='supplier_name', y='production_volumes', color='product_type',
-                  text_auto=False, title="Top 5 Suppliers by Product Type",
+                  text_auto=True, title="Top 5 Suppliers by Product Type",
                   template='plotly_white', color_discrete_sequence=px.colors.sequential.Teal)
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -144,6 +144,7 @@ st.markdown("""
 Developed by <b>Ravi Yadav</b> | Supply Chain Analytics | © 2025
 </p>
 """, unsafe_allow_html=True)
+
 
 
 
