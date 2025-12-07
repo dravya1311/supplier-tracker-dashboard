@@ -43,20 +43,6 @@ df['lead_time'] = pd.to_numeric(df['lead_time'], errors='coerce')
 df['number_of_products_sold'] = pd.to_numeric(df['number_of_products_sold'], errors='coerce')
 
 # ----------------------------------------
-# 🎛️ Sidebar Filters
-# ----------------------------------------
-st.sidebar.header("🔍 Filters")
-supplier_filter = st.sidebar.multiselect("Select Supplier(s)", df['supplier_name'].unique())
-origin_filter = st.sidebar.multiselect("Select Origin(s)", df['origin'].unique())
-destination_filter = st.sidebar.multiselect("Select Destination(s)", df['destination'].unique())
-
-filtered_df = df.copy()
-if supplier_filter:
-    filtered_df = filtered_df[filtered_df['supplier_name'].isin(supplier_filter)]
-if origin_filter:
-    filtered_df = filtered_df[filtered_df['origin'].isin(origin_filter)]
-if destination_filter:
-    filtered_df = filtered_df[filtered_df['destination'].isin(destination_filter)]
 
 # ----------------------------------------
 # 🔢 KPI Summary Cards
@@ -144,3 +130,4 @@ st.markdown("""
 Developed by <b>Ravi Yadav</b> | Supply Chain Analytics | © 2025
 </p>
 """, unsafe_allow_html=True)
+
